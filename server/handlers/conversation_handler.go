@@ -245,3 +245,36 @@ func GetPublicConversation(c *fiber.Ctx) error {
 		"conversation": conversation,
 	})
 }
+
+// GetPublicConversationMessages returns messages for a public conversation
+func GetPublicConversationMessages(c *fiber.Ctx) error {
+	// Get conversation ID from URL
+	conversationID := c.Params("id")
+
+	// Find all messages for the conversation
+	var messages []models.Message
+	database.DB.Where("conversation_id = ?", conversationID).Order("created_at ASC").Find(&messages)
+
+	// Get sender information for each message
+	for i := range messages {
+		if messages[i].IsOwner {
+			// For owner messages, fetch the user
+			var sender models.User
+			database.DB.Select("id, name").Where("id = ?", messages[i].SenderID).First(&sender)
+			messages[i].Sender = sender
+		} else {
+			// For customer messages, use the message's sender ID and conversation's customer name
+			var conversation models.Conversation
+			database.DB.Select("customer_name").Where("id = ?", conversationID).First(&conversation)
+			
+			messages[i].Sender = models.User{
+				ID:   messages[i].SenderID,
+				Name: conversation.CustomerName,
+			}
+		}
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"messages": messages,
+	})
+}

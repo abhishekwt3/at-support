@@ -2,7 +2,10 @@
 
 import { useState, useEffect, useRef } from 'react';
 import MessageItem from './MessageItem';
-import { conversationAPI, messageAPI } from '../../lib/api';
+import { getSocket, joinConversation, sendMessage, listenForMessages, leaveConversation } from '../../lib/socket';
+
+// Backend API URL
+const API_URL = 'http://localhost:3001';
 
 export default function ChatWindow({ conversationId, customerId, customerName, isOwner = false }) {
   const [messages, setMessages] = useState([]);
@@ -11,12 +14,21 @@ export default function ChatWindow({ conversationId, customerId, customerName, i
   const messagesEndRef = useRef(null);
   
   useEffect(() => {
+    // Initial load of messages
     fetchMessages();
     
-    // Set up polling for new messages
-    const interval = setInterval(fetchMessages, 5000);
+    // Join the conversation room
+    joinConversation(conversationId);
     
-    return () => clearInterval(interval);
+    // Listen for new messages
+    listenForMessages((message) => {
+      setMessages((prevMessages) => [...prevMessages, message]);
+    });
+    
+    // Cleanup when unmounting
+    return () => {
+      leaveConversation(conversationId);
+    };
   }, [conversationId]);
   
   useEffect(() => {
@@ -25,8 +37,33 @@ export default function ChatWindow({ conversationId, customerId, customerName, i
   
   const fetchMessages = async () => {
     try {
-      const data = await conversationAPI.getConversationMessages(conversationId);
-      setMessages(data.messages);
+      // Prepare headers
+      const headers = {};
+      
+      // If user is owner (admin), add authentication
+      if (isOwner) {
+        const token = localStorage.getItem('token');
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+      }
+      
+      // Use direct fetch to the backend URL - using the public endpoint
+      // This is important: we're using a different endpoint for customers vs. admin
+      const endpoint = isOwner 
+        ? `/api/conversations/${conversationId}/messages` 
+        : `/api/conversation/public/${conversationId}/messages`;
+        
+      const response = await fetch(`${API_URL}${endpoint}`, { headers });
+      
+      if (!response.ok) {
+        console.error('Error fetching messages:', response.statusText);
+        setLoading(false);
+        return;
+      }
+      
+      const data = await response.json();
+      setMessages(data.messages || []);
       setLoading(false);
     } catch (error) {
       console.error('Error fetching messages:', error);
@@ -40,14 +77,16 @@ export default function ChatWindow({ conversationId, customerId, customerName, i
     if (!newMessage.trim()) return;
     
     try {
-      const data = await messageAPI.sendMessage({
+      // Use Socket.IO to send the message
+      sendMessage({
         content: newMessage,
         conversationId,
-        customerId,
-        customerName,
+        senderId: isOwner ? localStorage.getItem('userId') : customerId,
+        senderName: isOwner ? localStorage.getItem('userName') : customerName,
+        isOwner,
       });
       
-      setMessages([...messages, data.message]);
+      // Clear the input field
       setNewMessage('');
     } catch (error) {
       console.error('Error sending message:', error);

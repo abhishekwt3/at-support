@@ -33,7 +33,7 @@ export default function ChatPage({ params }) {
   
   const fetchConversation = async () => {
     try {
-      const response = await fetch(`/api/conversation/public/${conversationId}`);
+      const response = await fetch(`http://localhost:3001/api/conversation/public/${conversationId}`);
       
       if (!response.ok) {
         if (response.status === 404) {

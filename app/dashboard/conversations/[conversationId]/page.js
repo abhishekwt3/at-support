@@ -1,18 +1,15 @@
 "use client";
 
-import { use } from 'react';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import MessageItem from '../../../components/MessageItem';
-import { conversationAPI } from '../../../../lib/api';
+import { getSocket, joinConversation, sendMessage, listenForMessages, leaveConversation } from '../../../../lib/socket';
+
+// Backend API URL
+const API_URL = 'http://localhost:3001';
 
 export default function ConversationPage({ params }) {
-    // Unwrap params
-  const resolvedParams = use(params);
-  const { conversationId } = resolvedParams;
-  const { id } = params;
-  const { data: session, status } = useSession();
-  
+  const { conversationId } = params;
   const router = useRouter();
   const [conversation, setConversation] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -21,7 +18,7 @@ export default function ConversationPage({ params }) {
   const messagesEndRef = useRef(null);
   
   useEffect(() => {
-    // Check if user is authenticated using localStorage token instead of useSession
+    // Check if user is authenticated using localStorage token
     const token = localStorage.getItem('token');
     if (!token) {
       router.push('/');
@@ -30,9 +27,18 @@ export default function ConversationPage({ params }) {
     
     fetchConversation();
     
-    // Set up polling for new messages
-    const interval = setInterval(fetchConversation, 10000);
-    return () => clearInterval(interval);
+    // Join the conversation room
+    joinConversation(conversationId);
+    
+    // Listen for new messages
+    listenForMessages((message) => {
+      setMessages((prevMessages) => [...prevMessages, message]);
+    });
+    
+    // Cleanup when unmounting
+    return () => {
+      leaveConversation(conversationId);
+    };
   }, [conversationId, router]);
   
   useEffect(() => {
@@ -41,7 +47,12 @@ export default function ConversationPage({ params }) {
   
   const fetchConversation = async () => {
     try {
-      const response = await fetch(`/api/conversation/${id}`);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/api/conversations/${conversationId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       
       if (!response.ok) {
         if (response.status === 401) {
@@ -53,7 +64,7 @@ export default function ConversationPage({ params }) {
       
       const data = await response.json();
       setConversation(data.conversation);
-      setMessages(data.conversation.messages);
+      setMessages(data.conversation.messages || []);
       setLoading(false);
     } catch (error) {
       console.error('Error fetching conversation:', error);
@@ -67,23 +78,20 @@ export default function ConversationPage({ params }) {
     if (!newMessage.trim()) return;
     
     try {
-      const response = await fetch('/api/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          content: newMessage,
-          conversationId: id,
-        }),
+      const userId = localStorage.getItem('userId') || conversation.ownerId;
+      const userName = localStorage.getItem('userName') || 'Support Agent';
+      
+      // Use Socket.IO to send the message
+      sendMessage({
+        content: newMessage,
+        conversationId,
+        senderId: userId,
+        senderName: userName,
+        isOwner: true, // This is the owner's interface
       });
       
-      const data = await response.json();
-      
-      if (response.ok) {
-        setMessages([...messages, data.message]);
-        setNewMessage('');
-      }
+      // Clear the input field
+      setNewMessage('');
     } catch (error) {
       console.error('Error sending message:', error);
     }
@@ -95,12 +103,19 @@ export default function ConversationPage({ params }) {
     }
     
     try {
-      const response = await fetch(`/api/conversation/${id}`, {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/api/conversations/${conversationId}`, {
         method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
       
       if (response.ok) {
         router.push('/dashboard');
+      } else {
+        const data = await response.json();
+        console.error('Error deleting conversation:', data.error);
       }
     } catch (error) {
       console.error('Error deleting conversation:', error);
@@ -111,7 +126,7 @@ export default function ConversationPage({ params }) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
   
-  if (status === 'loading' || loading) {
+  if (loading) {
     return <div className="flex justify-center items-center h-screen">Loading...</div>;
   }
   

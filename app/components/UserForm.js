@@ -13,7 +13,7 @@ export default function UserForm({ portalId, onStartConversation }) {
     if (!customerName.trim() || !category.trim()) return;
     
     try {
-      const response = await fetch('/api/conversation/create', {
+      const response = await fetch('http://localhost:3001/api/conversation/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

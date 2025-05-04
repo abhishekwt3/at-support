@@ -1,14 +1,11 @@
 "use client";
 
-import { use } from 'react'; // Add this import
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import UserForm from '../../../components/UserForm';
 import ChatWindow from '../../../components/ChatWindow';
 
 export default function ConversationPage({ params }) {
-  const resolvedParams = use(params);
-  const { portalId, conversationCode } = resolvedParams;
+  const { portalId, conversationCode } = params;
   const router = useRouter();
   const [portal, setPortal] = useState(null);
   const [conversation, setConversation] = useState(null);
@@ -40,7 +37,8 @@ export default function ConversationPage({ params }) {
   const fetchPortalAndConversation = async () => {
     try {
       // First, fetch the portal for the name
-      const portalResponse = await fetch(`/api/portal/${portalId}`);
+      console.log(`Fetching portal with ID: ${portalId}`);
+      const portalResponse = await fetch(`http://localhost:3001/api/portal/${portalId}`);
       
       if (!portalResponse.ok) {
         if (portalResponse.status === 404) {
@@ -56,7 +54,8 @@ export default function ConversationPage({ params }) {
       setPortal(portalData.portal);
       
       // Then, fetch the conversation by code
-      const convResponse = await fetch(`/api/conversation/code/${conversationCode}`);
+      console.log(`Fetching conversation with code: ${conversationCode}`);
+      const convResponse = await fetch(`http://localhost:3001/api/conversation/code/${conversationCode}`);
       
       if (!convResponse.ok) {
         if (convResponse.status === 404) {
@@ -87,7 +86,7 @@ export default function ConversationPage({ params }) {
     
     // Update the conversation with the customer name
     try {
-      await fetch(`/api/conversation/${conversation.id}/update-customer`, {
+      await fetch(`http://localhost:3001/api/conversation/${conversation.id}/update-customer`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

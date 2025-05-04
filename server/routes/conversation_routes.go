@@ -1,3 +1,4 @@
+// server/routes/conversation_routes.go
 package routes
 
 import (
@@ -20,7 +21,7 @@ func setupConversationRoutes(api fiber.Router) {
 	// Delete conversation
 	conversations.Delete("/:id", handlers.DeleteConversation)
 
-	// Get messages for a conversation
+	// Get messages for a conversation (authenticated)
 	conversations.Get("/:id/messages", handlers.GetConversationMessages)
 
 	// Public routes (don't require authentication)
@@ -28,4 +29,7 @@ func setupConversationRoutes(api fiber.Router) {
 	api.Put("/conversation/:id/update-customer", handlers.UpdateCustomerInfo)
 	api.Post("/conversation/create", handlers.CreateConversation)
 	api.Get("/conversation/public/:id", handlers.GetPublicConversation)
+	
+	// NEW: Public endpoint to get messages for a conversation
+	api.Get("/conversation/public/:id/messages", handlers.GetPublicConversationMessages)
 }

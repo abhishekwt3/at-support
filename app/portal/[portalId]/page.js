@@ -35,7 +35,7 @@ export default function PortalPage({ params }) {
   
   const fetchPortal = async () => {
     try {
-      const response = await fetch(`/api/portal/${portalId}`);
+      const response = await fetch(`http://localhost:3001/api/portal/${portalId}`);
       
       if (!response.ok) {
         if (response.status === 404) {
