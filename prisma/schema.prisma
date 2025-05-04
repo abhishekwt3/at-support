@@ -1,0 +1,56 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id            String         @id @default(cuid())
+  email         String         @unique
+  password      String
+  name          String
+  portals       Portal[]
+  conversations Conversation[] @relation("OwnerConversations")
+  messages      Message[]      @relation("UserMessages")
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model Portal {
+  id            String         @id @default(cuid())
+  name          String
+  ownerId       String
+  owner         User           @relation(fields: [ownerId], references: [id])
+  conversations Conversation[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model Conversation {
+  id           String    @id @default(cuid())
+  uniqueCode   String    @unique // Unique code for URL (e.g., FEN3131)
+  category     String
+  customerId   String
+  customerName String
+  ownerId      String
+  owner        User      @relation("OwnerConversations", fields: [ownerId], references: [id])
+  portalId     String
+  portal       Portal    @relation(fields: [portalId], references: [id])
+  messages     Message[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  content        String
+  senderId       String
+  sender         User         @relation("UserMessages", fields: [senderId], references: [id])
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  createdAt      DateTime     @default(now())
+  isOwner        Boolean      @default(false)
+}
