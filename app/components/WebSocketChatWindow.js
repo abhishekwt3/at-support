@@ -15,7 +15,7 @@ import {
 // Backend API URL
 const API_URL = 'http://localhost:3001';
 
-export default function ChatWindow({ conversationId, customerId, customerName, isOwner = false }) {
+export default function WebSocketChatWindow({ conversationId, customerId, customerName, isOwner = false }) {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
@@ -158,12 +158,12 @@ export default function ChatWindow({ conversationId, customerId, customerName, i
         {socketConnected ? (
           <span className="text-green-600 flex items-center">
             <span className="w-2 h-2 bg-green-600 rounded-full inline-block mr-2"></span>
-            Connected
+            Connected (WebSocket)
           </span>
         ) : (
           <span className="text-red-600 flex items-center">
             <span className="w-2 h-2 bg-red-600 rounded-full inline-block mr-2"></span>
-            Connecting...
+            Connecting... (WebSocket)
           </span>
         )}
       </div>

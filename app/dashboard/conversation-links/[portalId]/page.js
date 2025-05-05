@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { portalAPI } from '../../../../lib/api';
 
-
 export default function ConversationLinksPage({ params }) {
   const { portalId } = params;
   const router = useRouter();
@@ -72,8 +71,8 @@ export default function ConversationLinksPage({ params }) {
     }
   };
   
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(generatedLink);
+  const handleCopyLink = (link) => {
+    navigator.clipboard.writeText(link);
     alert('Link copied to clipboard!');
   };
   
@@ -163,7 +162,7 @@ export default function ConversationLinksPage({ params }) {
                     className="flex-1 p-2 border border-gray-300 rounded-l-md text-sm"
                   />
                   <button
-                    onClick={handleCopyLink}
+                    onClick={() => handleCopyLink(generatedLink)}
                     className="px-3 py-2 bg-gray-200 rounded-r-md hover:bg-gray-300"
                   >
                     Copy
@@ -171,6 +170,9 @@ export default function ConversationLinksPage({ params }) {
                 </div>
                 <p className="mt-2 text-xs text-gray-500">
                   Share this link with your customer to start a new conversation.
+                </p>
+                <p className="mt-1 text-xs text-green-600">
+                  This link uses WebSockets for real-time communication.
                 </p>
               </div>
             )}
@@ -202,8 +204,7 @@ export default function ConversationLinksPage({ params }) {
                           onClick={() => {
                             const baseUrl = window.location.origin;
                             const fullUrl = `${baseUrl}/portal/${portalId}/${conversation.uniqueCode}`;
-                            navigator.clipboard.writeText(fullUrl);
-                            alert('Link copied to clipboard!');
+                            handleCopyLink(fullUrl);
                           }}
                           className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-100"
                         >

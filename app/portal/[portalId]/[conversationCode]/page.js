@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import ChatWindow from '../../../components/ChatWindow';
+import WebSocketChatWindow from '../../../components/WebSocketChatWindow';
+
+// Do NOT import any Socket.io related files
 
 export default function ConversationPage({ params }) {
   const { portalId, conversationCode } = params;
@@ -157,10 +159,11 @@ export default function ConversationPage({ params }) {
             </form>
           </div>
         ) : (
-          <ChatWindow
+          <WebSocketChatWindow
             conversationId={conversation.id}
             customerId={customerId}
             customerName={customerName}
+            isOwner={false}
           />
         )}
       </div>

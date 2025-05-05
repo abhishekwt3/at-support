@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import MessageItem from '../../../components/MessageItem';
-import { getSocket, joinConversation, sendMessage, listenForMessages, leaveConversation } from '../../../../lib/socket';
+import WebSocketChatWindow from '../../../components/WebSocketChatWindow';
 
 // Backend API URL
 const API_URL = 'http://localhost:3001';
@@ -12,10 +11,7 @@ export default function ConversationPage({ params }) {
   const { conversationId } = params;
   const router = useRouter();
   const [conversation, setConversation] = useState(null);
-  const [messages, setMessages] = useState([]);
-  const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
-  const messagesEndRef = useRef(null);
   
   useEffect(() => {
     // Check if user is authenticated using localStorage token
@@ -26,24 +22,7 @@ export default function ConversationPage({ params }) {
     }
     
     fetchConversation();
-    
-    // Join the conversation room
-    joinConversation(conversationId);
-    
-    // Listen for new messages
-    listenForMessages((message) => {
-      setMessages((prevMessages) => [...prevMessages, message]);
-    });
-    
-    // Cleanup when unmounting
-    return () => {
-      leaveConversation(conversationId);
-    };
   }, [conversationId, router]);
-  
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
   
   const fetchConversation = async () => {
     try {
@@ -63,37 +42,18 @@ export default function ConversationPage({ params }) {
       }
       
       const data = await response.json();
+      console.log('Fetched conversation:', data.conversation);
       setConversation(data.conversation);
-      setMessages(data.conversation.messages || []);
       setLoading(false);
+      
+      // Store user info for message sending
+      if (data.conversation.owner) {
+        localStorage.setItem('userId', data.conversation.owner.id);
+        localStorage.setItem('userName', data.conversation.owner.name);
+      }
     } catch (error) {
       console.error('Error fetching conversation:', error);
       setLoading(false);
-    }
-  };
-  
-  const handleSendMessage = async (e) => {
-    e.preventDefault();
-    
-    if (!newMessage.trim()) return;
-    
-    try {
-      const userId = localStorage.getItem('userId') || conversation.ownerId;
-      const userName = localStorage.getItem('userName') || 'Support Agent';
-      
-      // Use Socket.IO to send the message
-      sendMessage({
-        content: newMessage,
-        conversationId,
-        senderId: userId,
-        senderName: userName,
-        isOwner: true, // This is the owner's interface
-      });
-      
-      // Clear the input field
-      setNewMessage('');
-    } catch (error) {
-      console.error('Error sending message:', error);
     }
   };
   
@@ -122,12 +82,8 @@ export default function ConversationPage({ params }) {
     }
   };
   
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-  
   if (loading) {
-    return <div className="flex justify-center items-center h-screen">Loading...</div>;
+    return <div className="flex justify-center items-center h-screen">Loading conversation...</div>;
   }
   
   if (!conversation) {
@@ -173,42 +129,12 @@ export default function ConversationPage({ params }) {
       </header>
       
       <div className="flex-1 max-w-4xl mx-auto w-full p-4 sm:p-6 lg:p-8 flex flex-col">
-        <div className="flex-1 bg-white rounded-lg shadow overflow-hidden flex flex-col">
-          <div className="flex-1 p-4 overflow-y-auto">
-            {messages.length === 0 ? (
-              <p className="text-center text-gray-500 my-8">No messages yet. Send a message to start the conversation.</p>
-            ) : (
-              <div className="space-y-4">
-                {messages.map((message) => (
-                  <MessageItem
-                    key={message.id}
-                    message={message}
-                    isOwner={message.isOwner}
-                  />
-                ))}
-                <div ref={messagesEndRef} />
-              </div>
-            )}
-          </div>
-          
-          <div className="border-t p-4">
-            <form onSubmit={handleSendMessage} className="flex gap-2">
-              <input
-                type="text"
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                className="flex-1 border border-gray-300 rounded-md shadow-sm p-2"
-                placeholder="Type your message..."
-              />
-              <button
-                type="submit"
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-              >
-                Send
-              </button>
-            </form>
-          </div>
-        </div>
+        <WebSocketChatWindow
+          conversationId={conversationId}
+          customerId={localStorage.getItem('userId')}
+          customerName={localStorage.getItem('userName')}
+          isOwner={true}
+        />
       </div>
     </div>
   );
