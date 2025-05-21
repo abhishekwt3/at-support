@@ -19,6 +19,11 @@ export default function ConversationList({ conversations, onSelectConversation }
     return 0;
   };
   
+  const handleClick = (conversationId) => {
+    console.log("Conversation clicked:", conversationId);
+    onSelectConversation(conversationId);
+  };
+  
   // If there are no conversations, show a message
   if (!conversations || conversations.length === 0) {
     return (
@@ -33,7 +38,7 @@ export default function ConversationList({ conversations, onSelectConversation }
       {conversations.map((conversation) => (
         <div
           key={conversation.id}
-          onClick={() => onSelectConversation(conversation.id)}
+          onClick={() => handleClick(conversation.id)}
           className="border rounded-md p-4 hover:bg-gray-50 cursor-pointer"
         >
           <div className="flex justify-between">

@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import ConversationList from '../components/ConversationList';
-import { portalAPI } from '@/lib/api';
+import WebSocketChatWindow from '../components/WebSocketChatWindow';
+import { portalAPI, conversationAPI } from '@/lib/api';
 
 export default function Dashboard() {
   const router = useRouter();
@@ -25,10 +26,13 @@ export default function Dashboard() {
   
   // Conversations state
   const [conversations, setConversations] = useState([]);
+  const [selectedConversation, setSelectedConversation] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [categoryView, setCategoryView] = useState(false);
   const [loadingCategories, setLoadingCategories] = useState(false);
   const [loadingConversations, setLoadingConversations] = useState(false);
+  
+  // View state
+  const [showChatInterface, setShowChatInterface] = useState(false);
 
   useEffect(() => {
     // Check if user is authenticated
@@ -51,7 +55,6 @@ export default function Dashboard() {
       if (data.portals && data.portals.length === 1) {
         setSelectedPortal(data.portals[0]);
         fetchCategories(data.portals[0].id);
-        fetchActiveConversations(data.portals[0].id);
       } else {
         setLoading(false);
       }
@@ -120,7 +123,6 @@ export default function Dashboard() {
       // Automatically select the newly created portal
       setSelectedPortal(newPortal);
       fetchCategories(newPortal.id);
-      fetchActiveConversations(newPortal.id);
     } catch (error) {
       console.error('Error creating portal:', error);
       setPortalError(error.message || 'Failed to create portal');
@@ -220,7 +222,7 @@ export default function Dashboard() {
       // If the deleted category was selected, unselect it
       if (selectedCategory && selectedCategory.slug === category.slug) {
         setSelectedCategory(null);
-        setCategoryView(false);
+        setShowChatInterface(false);
       }
     } catch (error) {
       console.error('Error deleting category:', error);
@@ -231,29 +233,42 @@ export default function Dashboard() {
   const handleSelectPortal = (portal) => {
     setSelectedPortal(portal);
     setSelectedCategory(null);
-    setCategoryView(false);
+    setSelectedConversation(null);
+    setShowChatInterface(false);
     fetchCategories(portal.id);
-    fetchActiveConversations(portal.id);
   };
   
   const handleSelectCategory = (category) => {
     setSelectedCategory(category);
-    setCategoryView(true);
+    setSelectedConversation(null);
+    setShowChatInterface(true);
     fetchActiveConversations(selectedPortal.id, category.slug);
   };
   
   const handleBackToCategories = () => {
     setSelectedCategory(null);
-    setCategoryView(false);
+    setSelectedConversation(null);
+    setShowChatInterface(false);
   };
   
-  const handleSelectConversation = (conversationId) => {
-    router.push(`/dashboard/conversations/${conversationId}`);
-  };
-  
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    router.push('/');
+  const handleSelectConversation = async (conversationId) => {
+    // Find the conversation in the current list
+    let conversation = conversations.find(c => c.id === conversationId);
+    
+    // If not found in current list, fetch it from the API
+    if (!conversation) {
+      try {
+        const data = await conversationAPI.getConversationById(conversationId);
+        conversation = data.conversation;
+      } catch (error) {
+        console.error("Error fetching conversation:", error);
+        return;
+      }
+    }
+    
+    if (conversation) {
+      setSelectedConversation(conversation);
+    }
   };
   
   const handleCopyLink = (link) => {
@@ -268,10 +283,148 @@ export default function Dashboard() {
     return `${baseUrl}/portal/${selectedPortal.customName}/${category.slug}`;
   };
   
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    router.push('/');
+  };
+  
   if (loading && !selectedPortal) {
     return <div className="flex justify-center items-center h-screen">Loading...</div>;
   }
   
+  // If showing chat interface, render the Slack/WhatsApp style interface
+  if (showChatInterface && selectedCategory) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col">
+        <header className="bg-white shadow">
+          <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
+            <div className="flex items-center">
+              <button 
+                onClick={handleBackToCategories}
+                className="text-blue-600 hover:text-blue-800 mr-3 flex items-center"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M9.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L7.414 9H15a1 1 0 110 2H7.414l2.293 2.293a1 1 0 010 1.414z" clipRule="evenodd" />
+                </svg>
+                Back to Dashboard
+              </button>
+              <h1 className="text-xl font-bold text-gray-900">{selectedCategory.name} - {selectedPortal.name}</h1>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => handleCopyLink(generateCategoryUrl(selectedCategory))}
+                className="px-3 py-1 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+              >
+                Copy Category Link
+              </button>
+              <button
+                onClick={handleLogout}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+              >
+                Logout
+              </button>
+            </div>
+          </div>
+        </header>
+        
+        <div className="flex-1 flex">
+          {/* Left Sidebar: Conversations List */}
+          <aside className="w-80 bg-white border-r border-gray-200 flex flex-col overflow-hidden">
+            <div className="p-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold">Conversations</h2>
+              {loadingConversations ? (
+                <div className="flex justify-center items-center h-12 mt-4">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+                </div>
+              ) : conversations.length === 0 ? (
+                <div className="text-center p-4">
+                  <p className="text-sm text-gray-500">No conversations in this category yet</p>
+                </div>
+              ) : (
+                <div className="mt-2 space-y-2">
+                  {conversations.map((conversation) => (
+                    <div
+                      key={conversation.id}
+                      onClick={() => handleSelectConversation(conversation.id)}
+                      className={`p-3 border rounded-md cursor-pointer ${
+                        selectedConversation?.id === conversation.id 
+                          ? 'bg-blue-50 border-blue-300' 
+                          : 'hover:bg-gray-50 border-gray-200'
+                      }`}
+                    >
+                      <div className="font-medium">
+                        {conversation.customerName === 'Unassigned' ? 'New Conversation' : conversation.customerName}
+                      </div>
+                      <div className="flex justify-between text-xs text-gray-500 mt-1">
+                        <span>Code: {conversation.uniqueCode}</span>
+                        <span>{conversation.messageCount || 0} messages</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </aside>
+          
+          {/* Main Content: Chat Window */}
+          <main className="flex-1 bg-gray-100 overflow-hidden flex flex-col">
+            {selectedConversation ? (
+              // Chat View
+              <div className="h-full flex flex-col">
+                <div className="p-4 bg-white border-b border-gray-200">
+                  <h2 className="font-semibold">
+                    {selectedConversation.customerName} - {selectedConversation.category}
+                  </h2>
+                  <p className="text-xs text-gray-500">
+                    Conversation Code: {selectedConversation.uniqueCode}
+                  </p>
+                </div>
+                <div className="flex-1 overflow-hidden">
+                  <WebSocketChatWindow
+                    conversationId={selectedConversation.id}
+                    customerId={localStorage.getItem('userId')}
+                    customerName={localStorage.getItem('userName')}
+                    isOwner={true}
+                  />
+                </div>
+              </div>
+            ) : (
+              // Empty State
+              <div className="h-full flex items-center justify-center">
+                <div className="text-center p-8 max-w-md">
+                  <h2 className="text-xl font-semibold mb-2">Select a Conversation</h2>
+                  <p className="text-gray-500 mb-4">
+                    {conversations.length === 0 
+                      ? "No conversations in this category yet. Share the category link with your customers to start receiving messages." 
+                      : "Select a conversation from the sidebar to start chatting"}
+                  </p>
+                  <div className="mt-4 p-3 bg-gray-200 rounded-md text-left">
+                    <div className="text-sm font-medium mb-1">Share this category link:</div>
+                    <div className="flex">
+                      <input
+                        type="text"
+                        value={generateCategoryUrl(selectedCategory)}
+                        readOnly
+                        className="flex-1 p-1.5 text-xs border border-gray-300 rounded-l-md"
+                      />
+                      <button
+                        onClick={() => handleCopyLink(generateCategoryUrl(selectedCategory))}
+                        className="px-2 py-1 bg-blue-600 text-white text-xs rounded-r-md"
+                      >
+                        Copy
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </main>
+        </div>
+      </div>
+    );
+  }
+  
+  // Otherwise, show the original dashboard layout
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow">
@@ -286,7 +439,7 @@ export default function Dashboard() {
         </div>
       </header>
       
-      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Portal Management - Left Sidebar */}
           <div className="lg:col-span-3 bg-white p-6 rounded-lg shadow">
@@ -388,7 +541,7 @@ export default function Dashboard() {
             )}
           </div>
           
-          {/* Middle Section - Categories or Conversations */}
+          {/* Middle Section - Categories */}
           <div className="lg:col-span-9">
             {!selectedPortal ? (
               <div className="bg-white p-6 rounded-lg shadow text-center">
@@ -397,64 +550,6 @@ export default function Dashboard() {
                     ? "Create a portal first to start managing your customer conversations." 
                     : "Select a portal from the left to manage categories and conversations."}
                 </p>
-              </div>
-            ) : categoryView ? (
-              /* View for Category Conversations */
-              <div className="bg-white p-6 rounded-lg shadow">
-                <div className="flex justify-between items-center mb-4">
-                  <div>
-                    <button 
-                      onClick={handleBackToCategories}
-                      className="text-blue-600 hover:text-blue-800 mb-2 flex items-center"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M9.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L7.414 9H15a1 1 0 110 2H7.414l2.293 2.293a1 1 0 010 1.414z" clipRule="evenodd" />
-                      </svg>
-                      Back to Categories
-                    </button>
-                    <h2 className="text-xl font-semibold">{selectedCategory?.name} Conversations</h2>
-                  </div>
-                  <div>
-                    <button
-                      onClick={() => handleCopyLink(generateCategoryUrl(selectedCategory))}
-                      className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-100"
-                    >
-                      Copy Category Link
-                    </button>
-                  </div>
-                </div>
-                
-                {loadingConversations ? (
-                  <div className="flex justify-center items-center h-48">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-                  </div>
-                ) : conversations.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="text-gray-500 mb-4">No active conversations in this category yet.</p>
-                    <p className="text-sm text-gray-500">
-                      Share this category link with your customers to start conversations:
-                    </p>
-                    <div className="mt-2 p-2 bg-gray-100 rounded flex">
-                      <input
-                        type="text"
-                        value={generateCategoryUrl(selectedCategory)}
-                        readOnly
-                        className="flex-1 p-1 text-sm border-none bg-transparent"
-                      />
-                      <button
-                        onClick={() => handleCopyLink(generateCategoryUrl(selectedCategory))}
-                        className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-sm"
-                      >
-                        Copy
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <ConversationList
-                    conversations={conversations}
-                    onSelectConversation={handleSelectConversation}
-                  />
-                )}
               </div>
             ) : (
               /* Categories View */
@@ -485,6 +580,12 @@ export default function Dashboard() {
                       Add Category
                     </button>
                   </form>
+                  
+                  {categoryError && (
+                    <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-md">
+                      <p className="text-sm text-red-600">{categoryError}</p>
+                    </div>
+                  )}
                   
                   {generatedLink && (
                     <div className="mt-6 p-4 bg-gray-50 rounded-md">
@@ -580,7 +681,7 @@ export default function Dashboard() {
                       1. Create support categories for different types of inquiries.<br />
                       2. Share the category links with your customers.<br />
                       3. When a customer accesses a link, a unique conversation is created.<br />
-                      4. Click on a category to view all conversations within that category.
+                      4. Click on a category or View Chats to manage conversations.
                     </p>
                   </div>
                 </div>

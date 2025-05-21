@@ -178,21 +178,23 @@ export default function WebSocketChatWindow({ conversationId, customerId, custom
   };
   
   if (loading) {
-    return <div className="flex justify-center items-center h-48">Loading conversations...</div>;
+    return <div className="flex justify-center items-center h-full">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+    </div>;
   }
   
   return (
-    <div className="flex-1 bg-white rounded-lg shadow overflow-hidden flex flex-col">
-      <div className="p-2 bg-gray-100 border-b text-sm">
+    <div className="h-full flex flex-col bg-white">
+      <div className="p-2 bg-gray-50 border-b border-gray-200 text-xs flex items-center">
         {socketConnected ? (
           <span className="text-green-600 flex items-center">
             <span className="w-2 h-2 bg-green-600 rounded-full inline-block mr-2"></span>
-            Connected (WebSocket)
+            Connected
           </span>
         ) : (
           <span className="text-red-600 flex items-center">
             <span className="w-2 h-2 bg-red-600 rounded-full inline-block mr-2"></span>
-            Connecting... (WebSocket)
+            Connecting...
           </span>
         )}
       </div>
@@ -215,7 +217,7 @@ export default function WebSocketChatWindow({ conversationId, customerId, custom
         )}
       </div>
       
-      <div className="border-t p-4">
+      <div className="border-t p-3 bg-white">
         <form onSubmit={handleSendMessage} className="flex gap-2">
           <input
             type="text"
