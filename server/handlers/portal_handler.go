@@ -10,7 +10,8 @@ import (
 
 // CreatePortalRequest represents the expected body for portal creation
 type CreatePortalRequest struct {
-	Name string `json:"name" validate:"required"`
+	Name       string `json:"name" validate:"required"`
+	CustomName string `json:"customName"`
 }
 
 // GenerateLinkRequest represents the expected body for generating a conversation link
@@ -49,12 +50,29 @@ func GetPortalByID(c *fiber.Ctx) error {
 	userID := c.Locals("userID").(string)
 	portalId := c.Params("id")
 	fmt.Printf("Looking up portal with ID: %s\n", portalId)
-	// Get portal ID from URL
-	portalID := c.Params("id")
-
+	
 	// Find the portal
 	var portal models.Portal
-	result := database.DB.Where("id = ? AND owner_id = ?", portalID, userID).First(&portal)
+	result := database.DB.Where("id = ? AND owner_id = ?", portalId, userID).First(&portal)
+	if result.Error != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Portal not found",
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"portal": portal,
+	})
+}
+
+// GetPortalByCustomName returns a specific portal by custom name
+func GetPortalByCustomName(c *fiber.Ctx) error {
+	// Get custom name from URL
+	customName := c.Params("customName")
+	
+	// Find the portal
+	var portal models.Portal
+	result := database.DB.Where("custom_name = ?", customName).Select("id, name, custom_name").First(&portal)
 	if result.Error != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"error": "Portal not found",
@@ -73,7 +91,7 @@ func GetPublicPortalByID(c *fiber.Ctx) error {
 
 	// Find the portal
 	var portal models.Portal
-	result := database.DB.Where("id = ?", portalID).Select("id, name").First(&portal)
+	result := database.DB.Where("id = ?", portalID).Select("id, name, custom_name").First(&portal)
 	if result.Error != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"error": "Portal not found",
@@ -122,11 +140,27 @@ func CreatePortal(c *fiber.Ctx) error {
 			"error": "This portal name is already taken",
 		})
 	}
+	
+	// Generate custom name if not provided
+	customName := req.CustomName
+	if customName == "" {
+		customName = utils.Slugify(req.Name)
+	} else {
+		customName = utils.Slugify(customName)
+	}
+	
+	// Check if custom name is already taken
+	result = database.DB.Where("custom_name = ?", customName).First(&existingPortal)
+	if result.RowsAffected > 0 {
+		// Append a random string to make it unique
+		customName = fmt.Sprintf("%s-%s", customName, utils.GenerateRandomCode())
+	}
 
 	// Create the portal
 	portal := models.Portal{
-		Name:    req.Name,
-		OwnerID: userID,
+		Name:       req.Name,
+		CustomName: customName,
+		OwnerID:    userID,
 	}
 
 	result = database.DB.Create(&portal)
@@ -263,6 +297,7 @@ func GenerateConversationLink(c *fiber.Ctx) error {
 	conversation := models.Conversation{
 		UniqueCode:   uniqueCode,
 		Category:     req.Category,
+		CategorySlug: utils.Slugify(req.Category),
 		CustomerID:   "placeholder", // Will be updated when a customer connects
 		CustomerName: "Unassigned",  // Will be updated when a customer connects
 		OwnerID:      userID,
@@ -276,8 +311,11 @@ func GenerateConversationLink(c *fiber.Ctx) error {
 		})
 	}
 
-	// Generate the conversation link
-	conversationLink := "/portal/" + portalID + "/" + uniqueCode
+	// Generate the conversation link using the new URL format
+	conversationLink := fmt.Sprintf("/portal/%s/%s/%s", 
+		portal.CustomName, 
+		conversation.CategorySlug, 
+		uniqueCode)
 
 	return c.Status(fiber.StatusCreated).JSON(LinkResponse{
 		Conversation:    conversation,

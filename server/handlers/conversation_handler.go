@@ -16,6 +16,13 @@ type CreateConversationRequest struct {
 	Category      string `json:"category" validate:"required"`
 }
 
+// GetConversationByURLParamsRequest represents the expected query params for finding a conversation
+type GetConversationByURLParamsRequest struct {
+	PortalName   string `json:"portalName" validate:"required"`
+	CategorySlug string `json:"categorySlug" validate:"required"`
+	UniqueCode   string `json:"uniqueCode" validate:"required"`
+}
+
 // UpdateCustomerRequest represents the expected body for updating customer info
 type UpdateCustomerRequest struct {
 	CustomerName string `json:"customerName" validate:"required"`
@@ -111,7 +118,7 @@ func GetConversationByCode(c *fiber.Ctx) error {
 	// Find the conversation
 	var conversation models.Conversation
 	result := database.DB.Preload("Portal", func(db *gorm.DB) *gorm.DB {
-		return db.Select("id, name")
+		return db.Select("id, name, custom_name")
 	}).Where("unique_code = ?", uniqueCode).First(&conversation)
 
 	if result.Error != nil {
@@ -122,6 +129,49 @@ func GetConversationByCode(c *fiber.Ctx) error {
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"conversation": conversation,
+	})
+}
+
+// GetConversationByURLParams returns a conversation by the URL parameters (portal name, category, unique code)
+func GetConversationByURLParams(c *fiber.Ctx) error {
+	// Get parameters from URL
+	portalName := c.Params("portalName")
+	categorySlug := c.Params("categorySlug")
+	uniqueCode := c.Params("uniqueCode")
+	
+	if portalName == "" || categorySlug == "" || uniqueCode == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Missing required URL parameters",
+		})
+	}
+	
+	// First, find the portal by custom name
+	var portal models.Portal
+	portalResult := database.DB.Where("custom_name = ?", portalName).First(&portal)
+	if portalResult.Error != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Portal not found",
+		})
+	}
+	
+	// Then, find the conversation
+	var conversation models.Conversation
+	result := database.DB.Where(
+		"portal_id = ? AND category_slug = ? AND unique_code = ?",
+		portal.ID, categorySlug, uniqueCode,
+	).Preload("Portal", func(db *gorm.DB) *gorm.DB {
+		return db.Select("id, name, custom_name")
+	}).First(&conversation)
+
+	if result.Error != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Conversation not found",
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"conversation": conversation,
+		"portal": portal,
 	})
 }
 
@@ -205,10 +255,14 @@ func CreateConversation(c *fiber.Ctx) error {
 		uniqueCode = utils.GenerateRandomCode()
 	}
 
+	// Create category slug - Updated to use utils.Slugify
+	categorySlug := utils.Slugify(req.Category)
+
 	// Create a new conversation
 	conversation := models.Conversation{
 		UniqueCode:   uniqueCode,
 		Category:     req.Category,
+		CategorySlug: categorySlug,
 		CustomerID:   "customer-" + utils.GenerateRandomCode(), // Generate a unique customer ID
 		CustomerName: req.CustomerName,
 		OwnerID:      portal.OwnerID,
@@ -234,7 +288,7 @@ func GetPublicConversation(c *fiber.Ctx) error {
 
 	// Find the conversation
 	var conversation models.Conversation
-	result := database.DB.Select("id, customer_name, category, portal_id").Where("id = ?", conversationID).First(&conversation)
+	result := database.DB.Select("id, customer_name, category, category_slug, portal_id").Where("id = ?", conversationID).First(&conversation)
 	if result.Error != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"error": "Conversation not found",

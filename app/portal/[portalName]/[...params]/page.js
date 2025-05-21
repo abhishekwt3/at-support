@@ -4,10 +4,41 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import WebSocketChatWindow from '../../../components/WebSocketChatWindow';
 
-// Do NOT import any Socket.io related files
+// Backend API URL
+const API_URL = 'http://localhost:3001';
 
-export default function ConversationPage({ params }) {
-  const { portalId, conversationCode } = params;
+export default function PortalParamsPage({ params }) {
+  // Extract URL parameters
+  const { portalName, params: urlParams } = params; 
+  
+  // We expect either [uniqueCode] or [categorySlug, uniqueCode]
+  if (!urlParams || urlParams.length < 1) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold mb-2">Invalid URL</h2>
+          <p className="text-gray-500">The URL format is incorrect.</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // Handle two formats:
+  // 1. /portal/[portalName]/[uniqueCode]
+  // 2. /portal/[portalName]/[categorySlug]/[uniqueCode]
+  
+  let categorySlug = '';
+  let uniqueCode = '';
+  
+  if (urlParams.length === 1) {
+    // Format 1: Just the uniqueCode
+    uniqueCode = urlParams[0];
+  } else {
+    // Format 2: categorySlug and uniqueCode
+    categorySlug = urlParams[0];
+    uniqueCode = urlParams[1];
+  }
+  
   const router = useRouter();
   const [portal, setPortal] = useState(null);
   const [conversation, setConversation] = useState(null);
@@ -19,48 +50,37 @@ export default function ConversationPage({ params }) {
   
   useEffect(() => {
     // Generate a unique ID for this customer if not already set
-    const generatedId = localStorage.getItem(`customer_id_${conversationCode}`) || 
+    const generatedId = localStorage.getItem(`customer_id_${uniqueCode}`) || 
       Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
     
-    localStorage.setItem(`customer_id_${conversationCode}`, generatedId);
+    localStorage.setItem(`customer_id_${uniqueCode}`, generatedId);
     setCustomerId(generatedId);
     
     // Check if customer name is already set
-    const savedName = localStorage.getItem(`customer_name_${conversationCode}`);
+    const savedName = localStorage.getItem(`customer_name_${uniqueCode}`);
     if (savedName) {
       setCustomerName(savedName);
       setFormSubmitted(true);
     }
     
-    // Fetch both portal and conversation
-    fetchPortalAndConversation();
-  }, [conversationCode, portalId]);
+    // Fetch conversation details based on the URL parameters
+    if (categorySlug) {
+      // Format 2: Use both parameters
+      fetchConversationByURLParams();
+    } else {
+      // Format 1: Use just the uniqueCode
+      fetchConversationByCode();
+    }
+  }, [portalName, categorySlug, uniqueCode]);
   
-  const fetchPortalAndConversation = async () => {
+  const fetchConversationByURLParams = async () => {
     try {
-      // First, fetch the portal for the name
-      console.log(`Fetching portal with ID: ${portalId}`);
-      const portalResponse = await fetch(`http://localhost:3001/api/portal/${portalId}`);
+      // Use the new endpoint to fetch conversation by URL parameters
+      console.log(`Fetching conversation with params: ${portalName}/${categorySlug}/${uniqueCode}`);
+      const response = await fetch(`${API_URL}/api/conversation/find/${portalName}/${categorySlug}/${uniqueCode}`);
       
-      if (!portalResponse.ok) {
-        if (portalResponse.status === 404) {
-          setError('This portal does not exist');
-        } else {
-          setError('Failed to load portal');
-        }
-        setLoading(false);
-        return;
-      }
-      
-      const portalData = await portalResponse.json();
-      setPortal(portalData.portal);
-      
-      // Then, fetch the conversation by code
-      console.log(`Fetching conversation with code: ${conversationCode}`);
-      const convResponse = await fetch(`http://localhost:3001/api/conversation/code/${conversationCode}`);
-      
-      if (!convResponse.ok) {
-        if (convResponse.status === 404) {
+      if (!response.ok) {
+        if (response.status === 404) {
           setError('This conversation link is invalid or has expired');
         } else {
           setError('Failed to load conversation');
@@ -69,8 +89,43 @@ export default function ConversationPage({ params }) {
         return;
       }
       
-      const convData = await convResponse.json();
-      setConversation(convData.conversation);
+      const data = await response.json();
+      setPortal(data.portal);
+      setConversation(data.conversation);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      setError('Failed to load conversation');
+      setLoading(false);
+    }
+  };
+  
+  const fetchConversationByCode = async () => {
+    try {
+      // Use the endpoint to fetch conversation by code
+      console.log(`Fetching conversation with code: ${uniqueCode}`);
+      const response = await fetch(`${API_URL}/api/conversation/code/${uniqueCode}`);
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          setError('This conversation code is invalid or has expired');
+        } else {
+          setError('Failed to load conversation');
+        }
+        setLoading(false);
+        return;
+      }
+      
+      const data = await response.json();
+      setConversation(data.conversation);
+      
+      // Fetch the portal separately
+      const portalResponse = await fetch(`${API_URL}/api/portal/${data.conversation.portalId}`);
+      if (portalResponse.ok) {
+        const portalData = await portalResponse.json();
+        setPortal(portalData.portal);
+      }
+      
       setLoading(false);
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -83,12 +138,12 @@ export default function ConversationPage({ params }) {
     if (!name.trim()) return;
     
     setCustomerName(name);
-    localStorage.setItem(`customer_name_${conversationCode}`, name);
+    localStorage.setItem(`customer_name_${uniqueCode}`, name);
     setFormSubmitted(true);
     
     // Update the conversation with the customer name
     try {
-      await fetch(`http://localhost:3001/api/conversation/${conversation.id}/update-customer`, {
+      await fetch(`${API_URL}/api/conversation/${conversation.id}/update-customer`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -118,12 +173,23 @@ export default function ConversationPage({ params }) {
     );
   }
   
+  if (!conversation || !portal) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold mb-2">Conversation not found</h2>
+          <p className="text-gray-500">This conversation may have been deleted.</p>
+        </div>
+      </div>
+    );
+  }
+  
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <header className="bg-white shadow">
         <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
           <h1 className="text-xl font-bold text-gray-900">{portal.name} Support</h1>
-          <p className="text-sm text-gray-500">Conversation #{conversationCode}</p>
+          <p className="text-sm text-gray-500">Category: {conversation.category}</p>
         </div>
       </header>
       

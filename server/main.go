@@ -15,10 +15,10 @@ import (
     "github.com/gofiber/websocket/v2"
     "github.com/joho/godotenv"
 
-   // "server/config"
     "server/database"
     "server/database/models"
     "server/routes"
+    "server/utils"
 )
 
 // WebSocket related types and variables
@@ -55,12 +55,14 @@ func main() {
         log.Println("No .env file found")
     }
 
-    // Initialize configuration
-    //cfg := config.LoadConfig()
-
     // Setup database connection
     if err := database.Connect(); err != nil {
         log.Fatalf("Failed to connect to database: %v", err)
+    }
+    
+    // Run data migration for new URL structure
+    if shouldMigrate() {
+        utils.MigrateData()
     }
 
     // Initialize Fiber app with custom settings
@@ -129,6 +131,20 @@ func main() {
     if err := app.Listen(":" + port); err != nil {
         log.Fatalf("Failed to start server: %v", err)
     }
+}
+
+// shouldMigrate checks if migration should be performed
+func shouldMigrate() bool {
+    // Default to true - always migrate by default
+    migrate := true
+    
+    // Check for env variable to disable migration
+    skipMigrate := os.Getenv("SKIP_MIGRATION")
+    if skipMigrate == "true" || skipMigrate == "1" || skipMigrate == "yes" {
+        migrate = false
+    }
+    
+    return migrate
 }
 
 // handleWebSocketConnection handles a new WebSocket connection

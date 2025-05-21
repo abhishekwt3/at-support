@@ -28,6 +28,8 @@ export default function WebSocketChatWindow({ conversationId, customerId, custom
     fetchMessages();
     
     // Initialize WebSocket connection
+    // For owner, use their actual user ID and name from localStorage
+    // For customer, use the provided customer ID and name
     connect(
       isOwner ? localStorage.getItem('userId') : customerId,
       isOwner ? localStorage.getItem('userName') : customerName,
@@ -49,13 +51,25 @@ export default function WebSocketChatWindow({ conversationId, customerId, custom
     // Listen for new messages
     const messageUnsubscribe = listenForMessages((message) => {
       console.log('Received new message in chat window:', message);
+      
+      // Format the incoming message to match database format
+      const formattedMessage = {
+        ...message,
+        // Ensure these fields are properly set for consistent UI rendering
+        isOwner: !!message.isOwner,
+        sender: message.sender || {
+          id: message.senderId,
+          name: message.senderName
+        }
+      };
+      
       setMessages((prevMessages) => {
         // Check if message already exists in the array to prevent duplicates
         // Also replace any temporary messages with real ones
         const filteredMessages = prevMessages.filter(m => 
           !m.id.startsWith('temp-') && m.id !== message.id
         );
-        return [...filteredMessages, message];
+        return [...filteredMessages, formattedMessage];
       });
     });
     
@@ -109,7 +123,17 @@ export default function WebSocketChatWindow({ conversationId, customerId, custom
       
       const data = await response.json();
       console.log('Fetched messages:', data.messages);
-      setMessages(data.messages || []);
+      
+      // Process messages to ensure consistent format
+      const processedMessages = data.messages?.map(message => {
+        return {
+          ...message,
+          // Ensure isOwner is always a boolean
+          isOwner: !!message.isOwner
+        };
+      }) || [];
+      
+      setMessages(processedMessages);
       setLoading(false);
     } catch (error) {
       console.error('Error fetching messages:', error);
@@ -131,7 +155,12 @@ export default function WebSocketChatWindow({ conversationId, customerId, custom
       
       // Add message to UI immediately for better UX
       if (tempMessage) {
-        setMessages(prev => [...prev, tempMessage]);
+        // Format the temporary message to match the database format
+        const formattedTempMessage = {
+          ...tempMessage,
+          isOwner: isOwner, // Explicitly set based on current user role
+        };
+        setMessages(prev => [...prev, formattedTempMessage]);
       }
       
       // Clear the input field

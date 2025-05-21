@@ -26,10 +26,15 @@ func setupConversationRoutes(api fiber.Router) {
 
 	// Public routes (don't require authentication)
 	api.Get("/conversation/code/:uniqueCode", handlers.GetConversationByCode)
+	api.Get("/conversation/find/:portalName/:categorySlug/:uniqueCode", handlers.GetConversationByURLParams)
+	
+	// New endpoint to handle category access and generate a new conversation
+	api.Get("/conversation/category/:portalName/:categorySlug", handlers.HandleCategoryAccess)
+	
 	api.Put("/conversation/:id/update-customer", handlers.UpdateCustomerInfo)
 	api.Post("/conversation/create", handlers.CreateConversation)
 	api.Get("/conversation/public/:id", handlers.GetPublicConversation)
 	
-	// NEW: Public endpoint to get messages for a conversation
+	// Public endpoint to get messages for a conversation
 	api.Get("/conversation/public/:id/messages", handlers.GetPublicConversationMessages)
 }

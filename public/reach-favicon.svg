@@ -1,0 +1,10 @@
+<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+  <!-- Chat Bubble Background -->
+  <rect x="2" y="2" width="28" height="28" rx="6" fill="#3B82F6" />
+  
+  <!-- Speech Bubble Icon with R -->
+  <path d="M7 8C7 7.44772 7.44772 7 8 7H24C24.5523 7 25 7.44772 25 8V20C25 20.5523 24.5523 21 24 21H18L13 25V21H8C7.44772 21 7 20.5523 7 20V8Z" fill="white" />
+  
+  <!-- R shape -->
+  <path d="M13 11H17C18.1046 11 19 11.8954 19 13C19 14.1046 18.1046 15 17 15H13V11ZM13 15H17L19 18H16.5L14.5 15.5H13V18H11V11H13V15Z" fill="#3B82F6" />
+</svg>

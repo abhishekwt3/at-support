@@ -6,6 +6,17 @@ export default function MessageItem({ message, isOwner, currentUserIsOwner }) {
   // Determine if this message is from the current user
   const isFromCurrentUser = isOwner === currentUserIsOwner;
   
+  // Determine the display name based on the context
+  let displayName;
+  
+  if (currentUserIsOwner) {
+    // Admin view: admin sees their messages as "You" and customer messages with customer's name
+    displayName = isOwner ? 'You' : (message.sender?.name || 'Customer');
+  } else {
+    // Customer view: customer sees their messages as "You" and admin messages as "Support Team"
+    displayName = isOwner ? 'Support Team' : 'You';
+  }
+  
   return (
     <div
       className={`flex ${isFromCurrentUser ? 'justify-end' : 'justify-start'}`}
@@ -19,7 +30,7 @@ export default function MessageItem({ message, isOwner, currentUserIsOwner }) {
       >
         <div className="flex justify-between items-center mb-1">
           <span className="font-semibold text-sm">
-            {message.sender?.name || 'Unknown User'}
+            {displayName}
           </span>
           <span className="text-xs opacity-75">
             {formatDate(message.createdAt)}

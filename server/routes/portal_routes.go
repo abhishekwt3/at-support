@@ -28,12 +28,21 @@ func setupPortalRoutes(api fiber.Router) {
 
 	// Get active conversations for a portal
 	portals.Get("/:id/active-conversations", handlers.GetPortalActiveConversations)
+	
+	// Get all categories for a portal
+	portals.Get("/:id/categories", handlers.GetPortalCategories)
+	
+	// Add a new category to a portal
+	portals.Post("/:id/categories", handlers.AddCategory)
 
 	// Public routes (don't require authentication)
 	portalPublic := api.Group("/portal")
 
-	// Get public portal info
+	// Get public portal info by ID
 	portalPublic.Get("/:id", handlers.GetPublicPortalByID)
+	
+	// Get public portal info by custom name
+	portalPublic.Get("/by-name/:customName", handlers.GetPortalByCustomName)
 
 	// Generate conversation link
 	portals.Post("/:id/generate-link", handlers.GenerateConversationLink)
