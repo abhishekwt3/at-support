@@ -22,6 +22,9 @@ func setupPortalRoutes(api fiber.Router) {
 
 	// Create a new portal
 	portals.Post("/", handlers.CreatePortal)
+	
+	// Update a portal
+	portals.Put("/:id", handlers.UpdatePortal)
 
 	// Get all conversations for a portal
 	portals.Get("/:id/conversations", handlers.GetPortalConversations)
@@ -34,6 +37,9 @@ func setupPortalRoutes(api fiber.Router) {
 	
 	// Add a new category to a portal
 	portals.Post("/:id/categories", handlers.AddCategory)
+	
+	// Delete a category
+	portals.Delete("/:id/categories/:categorySlug", handlers.DeleteCategory)
 
 	// Public routes (don't require authentication)
 	portalPublic := api.Group("/portal")

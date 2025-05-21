@@ -147,9 +147,24 @@ func AddCategory(c *fiber.Ctx) error {
 		})
 	}
 
+	// Generate a unique code for the placeholder conversation
+	uniqueCode := utils.GenerateRandomCode()
+
+	// Ensure the code is unique
+	for {
+		var existingConversation models.Conversation
+		result := database.DB.Where("unique_code = ?", uniqueCode).First(&existingConversation)
+		if result.Error != nil {
+			// No conversation found with this code, it's unique
+			break
+		}
+		// If code already exists, generate a new one
+		uniqueCode = utils.GenerateRandomCode()
+	}
+
 	// Create a placeholder conversation for this category
 	conversation := models.Conversation{
-		UniqueCode:   "placeholder", // Not used for this purpose
+		UniqueCode:   uniqueCode,  // Use a generated unique code instead of "placeholder"
 		Category:     req.Name,
 		CategorySlug: slug,
 		CustomerID:   "placeholder",
