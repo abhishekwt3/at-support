@@ -1,10 +1,9 @@
 package database
 
 import (
+	"fmt"
 	"log"
-	"os"
-
-	"gorm.io/driver/sqlite"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
@@ -14,12 +13,18 @@ import (
 
 var DB *gorm.DB
 
-// Connect establishes a connection to the database
+// Connect establishes a connection to the PostgreSQL database
 func Connect() error {
 	cfg := config.LoadConfig()
 
-	// Create database file path
-	dbPath := getEnv("DB_PATH", "customer_support.db")
+	// Create PostgreSQL connection string
+	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=UTC",
+		cfg.DBHost,
+		cfg.DBUser,
+		cfg.DBPassword,
+		cfg.DBName,
+		cfg.DBPort,
+	)
 
 	// Configure logger
 	gormConfig := &gorm.Config{}
@@ -29,9 +34,9 @@ func Connect() error {
 
 	// Connect to database
 	var err error
-	DB, err = gorm.Open(sqlite.Open(dbPath), gormConfig)
+	DB, err = gorm.Open(postgres.Open(dsn), gormConfig)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to connect to PostgreSQL database: %w", err)
 	}
 
 	// Auto migrate schemas
@@ -42,18 +47,9 @@ func Connect() error {
 		&models.Message{},
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to migrate database schemas: %w", err)
 	}
 
-	log.Println("Connected to SQLite database and migrated models")
+	log.Println("Connected to PostgreSQL database and migrated models")
 	return nil
-}
-
-// getEnv gets an environment variable or returns a default value
-func getEnv(key, defaultValue string) string {
-	value := os.Getenv(key)
-	if value == "" {
-		return defaultValue
-	}
-	return value
 }

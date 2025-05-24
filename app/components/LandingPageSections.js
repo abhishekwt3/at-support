@@ -67,32 +67,32 @@ export function HeroSection() {
   const rotatingWord = useRotatingText(['support', 'research', 'chat'], 1000);
 
   return (
-    <section className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white">
+    <section className="bg-white text-gray-900 border-b border-gray-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
           <div>
             <h1 className="text-4xl sm:text-5xl font-bold leading-tight mb-6">
               Launch your{' '}
-              <span className="inline-block min-w-[120px] text-yellow-300 transition-all duration-300 ease-in-out">
+              <span className="inline-block min-w-[120px] text-blue-600 transition-all duration-300 ease-in-out">
                 {rotatingWord}
-              </span>{' '}
+              </span>{''}
               portal in minutes
             </h1>
-            <p className="text-xl mb-8 text-blue-100">
+            <p className="text-xl mb-8 text-gray-600">
               Share link and start chatting. No complex systems. No steep learning curves. 
               Just simple, effective conversations with your customers.
             </p>
             <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
-              <Link href="/register" className="px-6 py-3 bg-white text-blue-600 rounded-md font-medium text-center hover:bg-blue-50 transition-colors">
+              <Link href="/register" className="px-6 py-3 bg-blue-600 text-white rounded-md font-medium text-center hover:bg-blue-700 transition-colors">
                 Get Started Free
               </Link>
-              <Link href="#demo" className="px-6 py-3 bg-transparent border border-white text-white rounded-md font-medium text-center hover:bg-white/10 transition-colors">
+              <Link href="#demo" className="px-6 py-3 bg-transparent border border-gray-300 text-gray-700 rounded-md font-medium text-center hover:bg-gray-50 transition-colors">
                 View Demo
               </Link>
             </div>
           </div>
           <div className="hidden md:block">
-            <div className="bg-white/10 backdrop-blur-sm p-8 rounded-2xl shadow-2xl border border-white/20">
+            <div className="bg-gray-50 p-8 rounded-2xl shadow-xl border border-gray-200">
               <ChatInterfaceIllustration />
             </div>
           </div>
@@ -237,44 +237,46 @@ export function PricingTestimonialsSection() {
     </svg>
   );
 
-  const pricingPlans = [
+const pricingPlans = [
     {
-      name: "Starter",
-      price: 9,
-      description: "Perfect for solo entrepreneurs and small businesses just getting started.",
+      name: "Free",
+      price: 0,
+      description: "Perfect for trying out our platform or personal projects.",
       features: [
         "1 Support portal",
-        "Up to 100 conversations/month",
+        "Up to 20 conversations/month",
         "Real-time chat",
-        "7-day message history"
+        "3-day message history",
+        "Basic email support"
+      ]
+    },
+    {
+      name: "Starter",
+      price: 5,
+      description: "Great for freelancers and small businesses getting started.",
+      isPopular: true,
+      features: [
+        "3 Support portals",
+        "Up to 200 conversations/month",
+        "Real-time chat",
+        "30-day message history",
+        "Email notifications",
+        "Priority email support"
       ]
     },
     {
       name: "Pro",
-      price: 29,
-      description: "For growing businesses with moderate support volume.",
-      isPopular: true,
-      features: [
-        "3 Support portals",
-        "Up to 500 conversations/month",
-        "Real-time chat",
-        "30-day message history",
-        "2 team members",
-        "Email notifications"
-      ]
-    },
-    {
-      name: "Business",
-      price: 79,
-      description: "For businesses with high support volume and multiple team members.",
+      price: 9,
+      description: "For growing businesses that need more conversations and features.",
       features: [
         "Unlimited support portals",
-        "Unlimited conversations",
+        "Up to 1000 conversations/month",
         "Real-time chat",
-        "Unlimited message history",
-        "10 team members",
+        "90-day message history",
         "Email notifications",
-        "Priority support"
+        "2 team members",
+        "Priority support",
+        "Advanced analytics"
       ]
     }
   ];

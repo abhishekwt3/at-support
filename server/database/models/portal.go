@@ -9,14 +9,14 @@ import (
 
 // Portal represents a support portal
 type Portal struct {
-	ID            string         `gorm:"primaryKey;type:varchar(36)" json:"id"`
-	Name          string         `gorm:"uniqueIndex;type:varchar(255)" json:"name"`
-	CustomName    string         `gorm:"uniqueIndex;type:varchar(255)" json:"customName"` // URL-friendly unique name
-	OwnerID       string         `gorm:"type:varchar(36)" json:"ownerId"`
-	Owner         User           `gorm:"foreignKey:OwnerID" json:"owner,omitempty"`
+	ID            string         `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	Name          string         `gorm:"type:varchar(255);uniqueIndex;not null" json:"name"`
+	CustomName    string         `gorm:"type:varchar(255);uniqueIndex" json:"customName"`
+	OwnerID       string         `gorm:"type:uuid;not null;index" json:"ownerId"`
+	Owner         User           `gorm:"foreignKey:OwnerID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"owner,omitempty"`
 	Conversations []Conversation `gorm:"foreignKey:PortalID" json:"conversations,omitempty"`
-	CreatedAt     time.Time      `json:"createdAt"`
-	UpdatedAt     time.Time      `json:"updatedAt"`
+	CreatedAt     time.Time      `gorm:"default:CURRENT_TIMESTAMP" json:"createdAt"`
+	UpdatedAt     time.Time      `gorm:"default:CURRENT_TIMESTAMP" json:"updatedAt"`
 }
 
 // BeforeCreate is a GORM hook that generates a UUID before creating a portal
