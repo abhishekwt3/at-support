@@ -230,77 +230,47 @@ func handleWebSocketConnection(c *websocket.Conn) {
             }
 
         case "message":
-               if msg.ConversationID != "" && msg.Content != "" {
-        log.Printf("Processing message: ConversationID=%s, SenderID=%s, Content=%s", 
-            msg.ConversationID, msg.SenderID, msg.Content)
-        
-        // First verify the conversation exists
-        var conversation models.Conversation
-        convResult := database.DB.Where("id = ?", msg.ConversationID).First(&conversation)
-        if convResult.Error != nil {
-            log.Printf("Error finding conversation %s: %v", msg.ConversationID, convResult.Error)
-            continue
-        }
-        
-        // Create and save the message to database
-        message := models.Message{
-            Content:        msg.Content,
-            SenderID:       msg.SenderID,
-            ConversationID: msg.ConversationID,
-            IsOwner:        msg.IsOwner,
-            CreatedAt:      time.Now(),
-        }
+            if msg.ConversationID != "" && msg.Content != "" {
+                // Create and save the message to database
+                message := models.Message{
+                    Content:        msg.Content,
+                    SenderID:       msg.SenderID,
+                    ConversationID: msg.ConversationID,
+                    IsOwner:        msg.IsOwner,
+                    CreatedAt:      time.Now(),
+                }
 
-        result := database.DB.Create(&message)
-        if result.Error != nil {
-            log.Printf("Error saving message to database: %v", result.Error)
-            log.Printf("Message details: %+v", message)
-            
-            // Send error message back to client
-            errorMsg := WSMessage{
-                Type: "error",
-                Data: map[string]interface{}{
-                    "error": "Failed to save message",
-                },
+                result := database.DB.Create(&message)
+                if result.Error != nil {
+                    log.Printf("Error saving message to database: %v", result.Error)
+                    continue
+                }
+
+                // Update conversation timestamp
+                database.DB.Model(&models.Conversation{}).Where("id = ?", msg.ConversationID).Update("updated_at", message.CreatedAt)
+
+                // Create a new message to broadcast
+                broadcastMsg := WSMessage{
+                    Type:           "new_message",
+                    Content:        message.Content,
+                    ConversationID: message.ConversationID,
+                    SenderID:       message.SenderID,
+                    SenderName:     msg.SenderName,
+                    IsOwner:        message.IsOwner,
+                    Data: map[string]interface{}{
+                        "id":          message.ID,
+                        "createdAt":   message.CreatedAt,
+                        "sender": map[string]interface{}{
+                            "id":   msg.SenderID,
+                            "name": msg.SenderName,
+                        },
+                    },
+                }
+
+                // Broadcast to the room
+                wsBroadcastToRoom(msg.ConversationID, broadcastMsg)
+                log.Printf("Broadcasted message to room %s", msg.ConversationID)
             }
-            wsSendToClient(client, errorMsg)
-            continue
-        }
-        
-        log.Printf("Message saved successfully with ID: %s", message.ID)
-
-        // Update conversation timestamp
-        updateResult := database.DB.Model(&models.Conversation{}).
-            Where("id = ?", msg.ConversationID).
-            Update("updated_at", message.CreatedAt)
-        if updateResult.Error != nil {
-            log.Printf("Error updating conversation timestamp: %v", updateResult.Error)
-        }
-
-        // Create a new message to broadcast
-        broadcastMsg := WSMessage{
-            Type:           "new_message",
-            Content:        message.Content,
-            ConversationID: message.ConversationID,
-            SenderID:       message.SenderID,
-            SenderName:     msg.SenderName,
-            IsOwner:        message.IsOwner,
-            Data: map[string]interface{}{
-                "id":          message.ID,
-                "createdAt":   message.CreatedAt,
-                "sender": map[string]interface{}{
-                    "id":   msg.SenderID,
-                    "name": msg.SenderName,
-                },
-            },
-        }
-        // Broadcast to the room
-        wsBroadcastToRoom(msg.ConversationID, broadcastMsg)
-        log.Printf("Broadcasted message to room %s", msg.ConversationID)
-    } else {
-        log.Printf("Invalid message: missing ConversationID or Content")
-    }
-
         }
     }
 }
