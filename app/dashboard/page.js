@@ -30,9 +30,6 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [loadingCategories, setLoadingCategories] = useState(false);
   const [loadingConversations, setLoadingConversations] = useState(false);
-  
-  // View state
-  const [showChatInterface, setShowChatInterface] = useState(false);
 
   useEffect(() => {
     // Check if user is authenticated
@@ -218,12 +215,6 @@ export default function Dashboard() {
       
       // Remove the category from the list
       setCategories(categories.filter(cat => cat.slug !== category.slug));
-      
-      // If the deleted category was selected, unselect it
-      if (selectedCategory && selectedCategory.slug === category.slug) {
-        setSelectedCategory(null);
-        setShowChatInterface(false);
-      }
     } catch (error) {
       console.error('Error deleting category:', error);
       setCategoryError(error.message || 'Failed to delete category');
@@ -239,36 +230,18 @@ export default function Dashboard() {
   };
   
   const handleSelectCategory = (category) => {
-    setSelectedCategory(category);
-    setSelectedConversation(null);
-    setShowChatInterface(true);
-    fetchActiveConversations(selectedPortal.id, category.slug);
+    // Navigate to separate page for viewing chats in this category
+    router.push(`/dashboard/category/${selectedPortal.id}/${category.slug}`);
   };
   
   const handleBackToCategories = () => {
     setSelectedCategory(null);
     setSelectedConversation(null);
-    setShowChatInterface(false);
   };
   
   const handleSelectConversation = async (conversationId) => {
-    // Find the conversation in the current list
-    let conversation = conversations.find(c => c.id === conversationId);
-    
-    // If not found in current list, fetch it from the API
-    if (!conversation) {
-      try {
-        const data = await conversationAPI.getConversationById(conversationId);
-        conversation = data.conversation;
-      } catch (error) {
-        console.error("Error fetching conversation:", error);
-        return;
-      }
-    }
-    
-    if (conversation) {
-      setSelectedConversation(conversation);
-    }
+    // Navigate to individual conversation page
+    router.push(`/dashboard/conversations/${conversationId}`);
   };
   
   const handleCopyLink = (link) => {
@@ -288,143 +261,7 @@ export default function Dashboard() {
     router.push('/');
   };
   
-  if (loading && !selectedPortal) {
-    return <div className="flex justify-center items-center h-screen">Loading...</div>;
-  }
-  
-  // If showing chat interface, render the Slack/WhatsApp style interface
-  if (showChatInterface && selectedCategory) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex flex-col">
-        <header className="bg-white shadow">
-          <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-            <div className="flex items-center">
-              <button 
-                onClick={handleBackToCategories}
-                className="text-blue-600 hover:text-blue-800 mr-3 flex items-center"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M9.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L7.414 9H15a1 1 0 110 2H7.414l2.293 2.293a1 1 0 010 1.414z" clipRule="evenodd" />
-                </svg>
-                Back to Dashboard
-              </button>
-              <h1 className="text-xl font-bold text-gray-900">{selectedCategory.name} - {selectedPortal.name}</h1>
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => handleCopyLink(generateCategoryUrl(selectedCategory))}
-                className="px-3 py-1 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
-              >
-                Copy Category Link
-              </button>
-              <button
-                onClick={handleLogout}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
-              >
-                Logout
-              </button>
-            </div>
-          </div>
-        </header>
-        
-        <div className="flex-1 flex">
-          {/* Left Sidebar: Conversations List */}
-          <aside className="w-80 bg-white border-r border-gray-200 flex flex-col overflow-hidden">
-            <div className="p-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold">Conversations</h2>
-              {loadingConversations ? (
-                <div className="flex justify-center items-center h-12 mt-4">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
-                </div>
-              ) : conversations.length === 0 ? (
-                <div className="text-center p-4">
-                  <p className="text-sm text-gray-500">No conversations in this category yet</p>
-                </div>
-              ) : (
-                <div className="mt-2 space-y-2">
-                  {conversations.map((conversation) => (
-                    <div
-                      key={conversation.id}
-                      onClick={() => handleSelectConversation(conversation.id)}
-                      className={`p-3 border rounded-md cursor-pointer ${
-                        selectedConversation?.id === conversation.id 
-                          ? 'bg-blue-50 border-blue-300' 
-                          : 'hover:bg-gray-50 border-gray-200'
-                      }`}
-                    >
-                      <div className="font-medium">
-                        {conversation.customerName === 'Unassigned' ? 'New Conversation' : conversation.customerName}
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-500 mt-1">
-                        <span>Code: {conversation.uniqueCode}</span>
-                        <span>{conversation.messageCount || 0} messages</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </aside>
-          
-          {/* Main Content: Chat Window */}
-          <main className="flex-1 bg-gray-100 overflow-hidden flex flex-col">
-            {selectedConversation ? (
-              // Chat View
-              <div className="h-full flex flex-col">
-                <div className="p-4 bg-white border-b border-gray-200">
-                  <h2 className="font-semibold">
-                    {selectedConversation.customerName} - {selectedConversation.category}
-                  </h2>
-                  <p className="text-xs text-gray-500">
-                    Conversation Code: {selectedConversation.uniqueCode}
-                  </p>
-                </div>
-                <div className="flex-1 overflow-hidden">
-                  <WebSocketChatWindow
-                    conversationId={selectedConversation.id}
-                    customerId={localStorage.getItem('userId')}
-                    customerName={localStorage.getItem('userName')}
-                    isOwner={true}
-                  />
-                </div>
-              </div>
-            ) : (
-              // Empty State
-              <div className="h-full flex items-center justify-center">
-                <div className="text-center p-8 max-w-md">
-                  <h2 className="text-xl font-semibold mb-2">Select a Conversation</h2>
-                  <p className="text-gray-500 mb-4">
-                    {conversations.length === 0 
-                      ? "No conversations in this category yet. Share the category link with your customers to start receiving messages." 
-                      : "Select a conversation from the sidebar to start chatting"}
-                  </p>
-                  <div className="mt-4 p-3 bg-gray-200 rounded-md text-left">
-                    <div className="text-sm font-medium mb-1">Share this category link:</div>
-                    <div className="flex">
-                      <input
-                        type="text"
-                        value={generateCategoryUrl(selectedCategory)}
-                        readOnly
-                        className="flex-1 p-1.5 text-xs border border-gray-300 rounded-l-md"
-                      />
-                      <button
-                        onClick={() => handleCopyLink(generateCategoryUrl(selectedCategory))}
-                        className="px-2 py-1 bg-blue-600 text-white text-xs rounded-r-md"
-                      >
-                        Copy
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </main>
-        </div>
-      </div>
-    );
-  }
-  
-  // Otherwise, show the original dashboard layout
+  // Remove the chat interface section and show only the original dashboard
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow">
@@ -624,52 +461,53 @@ export default function Dashboard() {
                   ) : categories.length === 0 ? (
                     <p className="text-gray-500">No categories created yet. Add a category to generate a shareable link.</p>
                   ) : (
-                    <div className="space-y-2">
+                    <div className="space-y-4">
                       {categories.map((category) => (
                         <div
                           key={category.id}
-                          className="border rounded-md p-4 hover:bg-gray-50"
+                          className="relative border rounded-md p-6 hover:bg-gray-50"
                         >
-                          <div className="flex justify-between items-start">
-                            <div 
-                              className="cursor-pointer"
-                              onClick={() => handleSelectCategory(category)}
-                            >
-                              <h3 className="font-medium">{category.name}</h3>
-                              <p className="text-sm text-gray-500">Active conversations: {category.activeCount || 0}</p>
-                            </div>
-                            <div className="flex space-x-2">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  const fullUrl = generateCategoryUrl(category);
-                                  handleCopyLink(fullUrl);
-                                }}
-                                className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-100"
-                              >
-                                Copy Link
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleSelectCategory(category);
-                                }}
-                                className="px-3 py-1 text-sm bg-blue-50 text-blue-600 border border-blue-200 rounded hover:bg-blue-100"
-                              >
-                                View Chats
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteCategory(category);
-                                }}
-                                className="px-3 py-1 text-sm bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100"
-                                title="Delete this category"
-                              >
-                                Delete
-                              </button>
-                            </div>
+                          <div 
+                            className="cursor-pointer"
+                            onClick={() => handleSelectCategory(category)}
+                          >
+                            <h3 className="font-medium text-lg">{category.name}</h3>
+                            <p className="text-sm text-gray-500 mt-1">Active conversations: {category.activeCount || 0}</p>
                           </div>
+                          
+                          <div className="mt-4 flex space-x-2">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const fullUrl = generateCategoryUrl(category);
+                                handleCopyLink(fullUrl);
+                              }}
+                              className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-100"
+                            >
+                              Copy Link
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSelectCategory(category);
+                              }}
+                              className="px-3 py-1 text-sm bg-blue-50 text-blue-600 border border-blue-200 rounded hover:bg-blue-100"
+                            >
+                              View Chats
+                            </button>
+                          </div>
+                          
+                          {/* Delete button in bottom right corner */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteCategory(category);
+                            }}
+                            className="absolute bottom-3 right-3 text-xs text-red-600 hover:text-red-800 hover:bg-red-50 px-2 py-1 rounded"
+                            title="Delete this category"
+                          >
+                            delete
+                          </button>
                         </div>
                       ))}
                     </div>
